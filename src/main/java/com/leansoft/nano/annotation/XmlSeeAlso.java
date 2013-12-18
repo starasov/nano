@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
  * @author starasov
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
+@Target(ElementType.TYPE)
 public @interface XmlSeeAlso {
     Class[] value();
 }
