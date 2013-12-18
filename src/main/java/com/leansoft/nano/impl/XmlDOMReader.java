@@ -1,37 +1,30 @@
 package com.leansoft.nano.impl;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
 import com.leansoft.nano.Format;
 import com.leansoft.nano.IReader;
-import com.leansoft.nano.annotation.schema.AnyElementSchema;
-import com.leansoft.nano.annotation.schema.AttributeSchema;
-import com.leansoft.nano.annotation.schema.ElementSchema;
-import com.leansoft.nano.annotation.schema.RootElementSchema;
-import com.leansoft.nano.annotation.schema.ValueSchema;
+import com.leansoft.nano.annotation.XmlSeeAlso;
+import com.leansoft.nano.annotation.XmlType;
+import com.leansoft.nano.annotation.schema.*;
 import com.leansoft.nano.exception.MappingException;
 import com.leansoft.nano.exception.ReaderException;
 import com.leansoft.nano.transform.Transformer;
 import com.leansoft.nano.util.StringUtil;
 import com.leansoft.nano.util.TypeReflector;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
 
 /**
@@ -219,7 +212,7 @@ public class XmlDOMReader implements IReader {
 					if (schemaObj != null && schemaObj instanceof ElementSchema) { // found match element
 						ElementSchema es = (ElementSchema)schemaObj;
 						Field field = es.getField();
-						Class<?> fieldType = field.getType();
+						Class<?> fieldType = findObjectType(field, childElement);
 						
 						if (es.isList()) { // collection
 							@SuppressWarnings("unchecked")
@@ -292,4 +285,30 @@ public class XmlDOMReader implements IReader {
 		}
 	}
 
+    protected Class<?> findObjectType(Field field, Element node) throws Exception {
+        Class<?> type = field.getType();
+
+        if (Modifier.isAbstract(type.getModifiers()) && node.hasAttribute("xsi:type")) {
+            String xsiTypeAttribute = node.getAttribute("xsi:type");
+            String[] parts = xsiTypeAttribute.split(":");
+            String typeDescriptor = parts.length == 2 ? parts[1] : parts[0];
+
+            XmlSeeAlso xmlSeeAlso = type.getAnnotation(XmlSeeAlso.class);
+            if (xmlSeeAlso == null) {
+                throw new ReaderException("Could not find corresponding @" + XmlSeeAlso.class.getSimpleName() + " annotation defined for " + type);
+            }
+
+            Class[] subclasses = xmlSeeAlso.value();
+            for (Class<?> subclass : subclasses) {
+                XmlType xmlType = subclass.getAnnotation(XmlType.class);
+                if (typeDescriptor.equals(xmlType.name())) {
+                    return subclass;
+                }
+            }
+
+            throw new ReaderException("Could not determine subtype for " + field.getName() + " of " + type);
+        } else {
+            return type;
+        }
+    }
 }
