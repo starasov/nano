@@ -1,5 +1,6 @@
 package com.leansoft.nano.impl;
 
+import javax.xml.parsers.DocumentBuilder;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -7,17 +8,13 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.xml.parsers.DocumentBuilder;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
 import com.leansoft.nano.Format;
 import com.leansoft.nano.annotation.schema.AnyElementSchema;
 import com.leansoft.nano.annotation.schema.RootElementSchema;
 import com.leansoft.nano.exception.MappingException;
 import com.leansoft.nano.exception.ReaderException;
-import com.leansoft.nano.impl.MappingSchema;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 public class SOAPReader extends XmlDOMReader {
 	
@@ -82,7 +79,7 @@ public class SOAPReader extends XmlDOMReader {
 			ReadContext readContext = CONTEXT.get();
 			readContext.innerClass = innerClazz;
 			
-			Object obj = this.buildObjectFromType(soapClazz);
+			Object obj = this.buildObjectFromType(soapClazz, rootElement);
 			
 			this.read(obj, rootElement);
 			
@@ -159,7 +156,7 @@ public class SOAPReader extends XmlDOMReader {
 			field.set(obj, list);
 			
 			for(Element childElement : matchElements) {
-				Object newObj = this.buildObjectFromType(bindClass);
+				Object newObj = this.buildObjectFromType(bindClass, null);
 				super.read(newObj, childElement);
 				list.add(newObj);
 			}

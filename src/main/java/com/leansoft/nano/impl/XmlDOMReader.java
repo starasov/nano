@@ -6,7 +6,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +84,7 @@ public class XmlDOMReader implements IReader {
 				throw new ReaderException("Root element name mismatch, " + rootElement.getLocalName() + " != " + xmlName);
 			}
 			
-			Object obj = this.buildObjectFromType(type);
+			Object obj = this.buildObjectFromType(type, rootElement);
 			
 			this.read(obj, rootElement);
 			
@@ -212,7 +211,7 @@ public class XmlDOMReader implements IReader {
 					if (schemaObj != null && schemaObj instanceof ElementSchema) { // found match element
 						ElementSchema es = (ElementSchema)schemaObj;
 						Field field = es.getField();
-						Class<?> fieldType = findObjectType(field, childElement);
+						Class<?> fieldType = field.getType();
 						
 						if (es.isList()) { // collection
 							@SuppressWarnings("unchecked")
@@ -234,7 +233,7 @@ public class XmlDOMReader implements IReader {
 									}
 								}
 							} else {
-								Object newObj = this.buildObjectFromType(parameterizedType);
+								Object newObj = this.buildObjectFromType(parameterizedType, childElement);
 								this.read(newObj, childElement);
 								list.add(newObj);
 							}
@@ -250,7 +249,7 @@ public class XmlDOMReader implements IReader {
 									}
 								}
 							} else {
-								Object newObj = this.buildObjectFromType(fieldType);
+								Object newObj = this.buildObjectFromType(fieldType, childElement);
 								this.read(newObj, childElement);
 								field.set(obj, newObj);
 							}
@@ -275,9 +274,10 @@ public class XmlDOMReader implements IReader {
 	}
 
 	
-	protected Object buildObjectFromType(Class<?> type) throws Exception {
+	protected Object buildObjectFromType(Class<?> type, Element node) throws Exception {
 		try {
-			Constructor<?> con = TypeReflector.getConstructor(type);
+            Class<?> refinedType = findObjectType(type, node);
+			Constructor<?> con = TypeReflector.getConstructor(refinedType);
 			Object obj = con.newInstance();
 			return obj;
 		} catch (NoSuchMethodException nsme) {
@@ -285,18 +285,13 @@ public class XmlDOMReader implements IReader {
 		}
 	}
 
-    protected Class<?> findObjectType(Field field, Element node) throws Exception {
-        Class<?> type = field.getType();
-
-        if (Modifier.isAbstract(type.getModifiers()) && node.hasAttribute("xsi:type")) {
+    protected Class<?> findObjectType(Class<?> type, Element node) throws Exception {
+        if (type.isAnnotationPresent(XmlSeeAlso.class) && node.hasAttribute("xsi:type")) {
             String xsiTypeAttribute = node.getAttribute("xsi:type");
             String[] parts = xsiTypeAttribute.split(":");
             String typeDescriptor = parts.length == 2 ? parts[1] : parts[0];
 
             XmlSeeAlso xmlSeeAlso = type.getAnnotation(XmlSeeAlso.class);
-            if (xmlSeeAlso == null) {
-                throw new ReaderException("Could not find corresponding @" + XmlSeeAlso.class.getSimpleName() + " annotation defined for " + type);
-            }
 
             Class[] subclasses = xmlSeeAlso.value();
             for (Class<?> subclass : subclasses) {
@@ -306,7 +301,7 @@ public class XmlDOMReader implements IReader {
                 }
             }
 
-            throw new ReaderException("Could not determine subtype for " + field.getName() + " of " + type);
+            throw new ReaderException("Could not determine subtype for " + type);
         } else {
             return type;
         }
