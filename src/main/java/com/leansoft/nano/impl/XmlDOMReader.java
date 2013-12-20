@@ -12,6 +12,7 @@ import java.util.Map;
 
 import com.leansoft.nano.Format;
 import com.leansoft.nano.IReader;
+import com.leansoft.nano.annotation.XmlIDREF;
 import com.leansoft.nano.annotation.XmlSeeAlso;
 import com.leansoft.nano.annotation.XmlType;
 import com.leansoft.nano.annotation.schema.*;
@@ -248,7 +249,10 @@ public class XmlDOMReader implements IReader {
 										field.set(obj, fieldValue);
 									}
 								}
-							} else {
+							} else if (field.isAnnotationPresent(XmlIDREF.class)) {
+                                String xmlValue = childElement.getTextContent();
+                                field.set(obj, xmlValue);
+                            } else {
 								Object newObj = this.buildObjectFromType(fieldType, childElement);
 								this.read(newObj, childElement);
 								field.set(obj, newObj);
